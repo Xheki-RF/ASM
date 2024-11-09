@@ -1,14 +1,15 @@
 """==============================================INITIAL DATA SECTION==============================================="""
+
 # List of commands
 command_dict = {
-    "lds": 0b000,   # DESCRIPTION: Takes 1 positional arguments: memory address
-    "add": 0b001,   # DESCRIPTION: Takes 1 positional argument: register
-    "out": 0b010,   # DESCRIPTION: Takes 1 positional argument: register
-    "mov": 0b011,   # DESCRIPTION: Takes 1 positional argument: register
-    "jnz": 0b100,   # DESCRIPTION: Takes 1 positional argument: procedure address
-    "lda": 0b101,   # DESCRIPTION: Takes 1 positional argument: address
-    "dec": 0b110,   # DESCRIPTION: Takes 1 positional argument: register
-    "inc": 0b111    # DESCRIPTION: Takes 1 positional argument: register
+    "lds": 0b000,  # DESCRIPTION: Takes 1 positional arguments: memory address
+    "add": 0b001,  # DESCRIPTION: Takes 1 positional argument: register
+    "out": 0b010,  # DESCRIPTION: Takes 1 positional argument: register
+    "mov": 0b011,  # DESCRIPTION: Takes 1 positional argument: register
+    "jnz": 0b100,  # DESCRIPTION: Takes 1 positional argument: procedure address
+    "lda": 0b101,  # DESCRIPTION: Takes 1 positional argument: address
+    "dec": 0b110,  # DESCRIPTION: Takes 1 positional argument: register
+    "inc": 0b111,  # DESCRIPTION: Takes 1 positional argument: register
 }
 
 # OVERVIEW: Lists for separated codes (after separating one huge code into fractions)
@@ -20,9 +21,9 @@ val_code_list_proc = []
 size = 8
 
 # Mixed memory of command and data
-cmd_dt_memory = [0] * 2 ** size
+cmd_dt_memory = [0] * 2**size
 # Registers' memory: R0...R15
-reg_data = [0] * 2 ** 4
+reg_data = [0] * 2**4
 
 # OVERVIEW: Special registers
 # Special register memory: Accumulator - stores the result of summation
@@ -35,7 +36,10 @@ TMP = 0
 
 
 # OVERVIEW: Flags
+# Flag to stop program counter
 stop_flag = False
+# Flag needed for JNZ
+is_zero = False
 
 # Program counter
 pc = 0
@@ -204,7 +208,7 @@ def code_to_sep_proc():
         cmd_code = cmd_to_sep >> 8
 
         # Getting register/memory slot code
-        val_code = (cmd_to_sep & 0b00011111111)
+        val_code = cmd_to_sep & 0b00011111111
 
         cmd_code_list_proc.append(cmd_code)
         val_code_list_proc.append(val_code)
@@ -226,7 +230,7 @@ def add_with_shift(a):
         bit_b = (ACM >> i) & 1
 
         current_sum = bit_a ^ bit_b ^ carry
-        result |= (current_sum << i)
+        result |= current_sum << i
 
         carry = (bit_a & bit_b) | (carry & (bit_a ^ bit_b))
 
@@ -235,25 +239,26 @@ def add_with_shift(a):
 
 # OVERVIEW: Function for jumping to certain program address
 def transition_check():
-    global pc, MSA, TMP, stop_flag
+    global pc, MSA, TMP, stop_flag, is_zero
 
     TMP = pc
     pc = val_code_list_proc[pc]
 
-    if reg_data[0] == 0:
+    if is_zero:
         if TMP < (cmd_amount - 1):
             pc = TMP
             pc += 1
+            is_zero = False
         else:
             stop_flag = True
 
 
 # OVERVIEW: Function for defining the command and calling certain function: lds, add, out
 def command_execution():
-    global TMP, MSA, ACM, pc, stop_flag
+    global TMP, MSA, ACM, pc, stop_flag, is_zero
 
     # DESCRIPTION: LDS
-    if cmd_code_list_proc[pc] == 0b000:     # Code 0
+    if cmd_code_list_proc[pc] == 0b000:  # Code 0
         print("LDS")
         if val_code_list_proc[pc] == 0xFE:
             TMP = cmd_dt_memory[MSA]
@@ -266,7 +271,7 @@ def command_execution():
             pc += 1
 
     # DESCRIPTION: ADD
-    elif cmd_code_list_proc[pc] == 0b001:     # Code 1
+    elif cmd_code_list_proc[pc] == 0b001:  # Code 1
         print("ADD")
         ACM = add_with_shift(reg_data[val_code_list_proc[pc]])
         print("SUM:", ACM)
@@ -276,7 +281,7 @@ def command_execution():
             pc += 1
 
     # DESCRIPTION: OUT
-    elif cmd_code_list_proc[pc] == 0b010:     # Code 2
+    elif cmd_code_list_proc[pc] == 0b010:  # Code 2
         print("OUT")
         if val_code_list_proc[pc] == 0xFF:
             print("Data out:", ACM)
@@ -292,7 +297,7 @@ def command_execution():
                 pc += 1
 
     # DESCRIPTION: MOV
-    elif cmd_code_list_proc[pc] == 0b011:     # Code 3
+    elif cmd_code_list_proc[pc] == 0b011:  # Code 3
         print("MOV")
         reg_data[val_code_list_proc[pc]] = TMP
         print(reg_data)
@@ -302,12 +307,12 @@ def command_execution():
             pc += 1
 
     # DESCRIPTION: JMP
-    elif cmd_code_list_proc[pc] == 0b100:   # Code 4
+    elif cmd_code_list_proc[pc] == 0b100:  # Code 4
         print("JMP")
         transition_check()
 
     # DESCRIPTION: LDA
-    elif cmd_code_list_proc[pc] == 0b101:   # Code 5
+    elif cmd_code_list_proc[pc] == 0b101:  # Code 5
         print("LDA")
         MSA = val_code_list_proc[pc]
         print("MSA:", MSA)
@@ -317,9 +322,13 @@ def command_execution():
             pc += 1
 
     # DESCRIPTION: DEC
-    elif cmd_code_list_proc[pc] == 0b110:   # Code 6
+    elif cmd_code_list_proc[pc] == 0b110:  # Code 6
         print("DEC")
         reg_data[val_code_list_proc[pc]] -= 1
+
+        if reg_data[val_code_list_proc[pc]] == 0:
+            is_zero = True
+
         print(reg_data)
         if pc == cmd_amount - 1:
             stop_flag = True
@@ -367,7 +376,9 @@ while True:
 
 print(command_list)
 
-procedure_dict = {procedure_list[i]: procedure_address[i] for i in range(len(procedure_list))}
+procedure_dict = {
+    procedure_list[i]: procedure_address[i] for i in range(len(procedure_list))
+}
 print("Procedures' markers:", procedure_dict)
 
 command_list_full = line_encoding(command_list)
@@ -378,7 +389,7 @@ for i in range(len(command_list_full)):
     cmd_dt_memory[i] = command_list_full[i]
 
 for i in range(len(mem_data)):
-    cmd_dt_memory[i + (2 ** size // 2)] = mem_data[i]
+    cmd_dt_memory[i + (2**size // 2)] = mem_data[i]
 
 print("Command/memory data:", cmd_dt_memory)
 
